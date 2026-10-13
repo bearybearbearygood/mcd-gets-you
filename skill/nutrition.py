@@ -195,7 +195,8 @@ def build_index(foods: Iterable[Food]) -> Dict[str, Food]:
     return index
 
 
-_MIN_PREFIX = 4
+_MIN_PREFIX = 4  # 前缀匹配的长度下限（策略较宽松，所以要求更长）
+_MIN_CONTAIN = 2  # 包含匹配的下限（一方完全包含另一方，约束本身已足够强）
 _PREFIX_RATIO = 0.6
 
 # 套餐类关键词。菜单里「X 三件套」与营养表里「X」是两个不同的东西
@@ -244,12 +245,19 @@ def match_food(menu_name: str, index: Dict[str, Food]) -> Optional[Food]:
 
     menu_is_combo = _is_combo(menu_name)
 
-    for candidate_key, food in index.items():
-        if len(candidate_key) < _MIN_PREFIX:
-            continue
-        if candidate_key in key or key in candidate_key:
-            if menu_is_combo == _is_combo(food.name):
-                return food
+    # 包含匹配：可能同时有多个营养名满足（菜单里的「薯条」既是「中薯条」
+    # 也是「迷你薯条」的子串）。此时取长度最接近的那个 —— 越贴近菜单名的
+    # 记录，越可能是同一个产品。
+    contained = [
+        (candidate_key, food)
+        for candidate_key, food in index.items()
+        if len(candidate_key) >= _MIN_CONTAIN
+        and (candidate_key in key or key in candidate_key)
+        and menu_is_combo == _is_combo(food.name)
+    ]
+    if contained:
+        contained.sort(key=lambda pair: abs(len(pair[0]) - len(key)))
+        return contained[0][1]
 
     core = _core_name(key)
     best: Optional[Food] = None

@@ -157,6 +157,7 @@ class Plan:
     carb: float = 0.0
     score: float = 0.0
     cost: Optional[float] = None
+    coupons: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
     @property
@@ -170,6 +171,8 @@ class Plan:
         text += f" / 钠 {self.sodium:.0f}mg"
         if self.cost is not None:
             text += f" / {self.cost:.1f} 元"
+        if self.coupons:
+            text += "  【可用券】" + "、".join(self.coupons)
         return text
 
 
@@ -192,6 +195,11 @@ class Weights:
 
     默认值体现产品的立场：补足蛋白是第一目标，钠是第二硬约束，
     热量是代价，脂肪是软约束。
+
+    `coupon` 刻意设得比 `protein` 低一个量级：券代表的是「价格」维度，
+    它应该只在「营养上打平」时起作用 —— 也就是用户说的
+    「双吉也行、麦香鸡也行，但有麦香鸡的券就优先麦香鸡」。
+    如果给它太高的权重，有券的低蛋白产品会挤掉营养上更优的方案。
     """
 
     protein: float = 1.0
@@ -199,6 +207,7 @@ class Weights:
     kcal: float = 0.35
     fat: float = 0.25
     cost: float = 0.0
+    coupon: float = 0.12
 
 
 def _sum(items: Sequence[tuple]) -> Plan:
@@ -213,11 +222,17 @@ def _sum(items: Sequence[tuple]) -> Plan:
     return plan
 
 
-def score_plan(plan: Plan, gap: Gap, weights: Weights) -> Tuple[float, List[str]]:
+def score_plan(
+    plan: Plan,
+    gap: Gap,
+    weights: Weights,
+    coupon_map: Optional[Dict[str, object]] = None,
+) -> Tuple[float, List[str]]:
     """给方案打分。分数越高越好；同时返回警告信息。
 
     评分设计：
         + 补足蛋白缺口（封顶在 1.0，超出的部分不再加分，避免鼓励暴食）
+        + 命中可用优惠券（权重远低于蛋白，只在营养打平时起作用）
         - 热量、钠、脂肪超出剩余预算的惩罚
     """
     warnings: List[str] = []
@@ -226,6 +241,14 @@ def score_plan(plan: Plan, gap: Gap, weights: Weights) -> Tuple[float, List[str]
 
     coverage = min(plan.protein / gap.protein, 1.0)
     value = coverage * weights.protein
+
+    # 优惠券：只记「今天真的可用」的券，命中即加分并记入方案，
+    # 供输出层提示用户用哪张券。
+    plan.coupons = []
+    if coupon_map:
+        plan.coupons = [it.food.name for it in plan.items if it.food.name in coupon_map]
+        if plan.coupons:
+            value += weights.coupon * min(len(plan.coupons), 2)
 
     over_kcal = max(0.0, plan.kcal - gap.kcal)
     over_sodium = max(0.0, plan.sodium - gap.sodium)
@@ -252,11 +275,15 @@ def recommend(
     max_portions_per_item: int = 2,
     top_n: int = 5,
     weights: Optional[Weights] = None,
+    coupon_map: Optional[Dict[str, object]] = None,
 ) -> List[Plan]:
     """在候选产品中搜索满足缺口的组合。
 
     candidates 应当是「当前门店在售」且「能匹配到营养数据」的单品集合，
     否则会推荐出用户买不到的东西。
+
+    coupon_map 是「营养名 -> 可用券」的映射，只应传入**此刻真的可用**的券
+    （日期、星期、时段三重校验通过）。它只作为次要加分项参与评分。
 
     搜索空间按组合数增长，所以先用「每克蛋白的热量代价」做一轮筛选，
     把候选压到 min_needed 个以内再枚举。
@@ -276,10 +303,18 @@ def recommend(
         return []
 
     pool.sort(key=lambda f: f.kcal_per_protein or 1e9)
+
+    # 剪枝：组合数随候选数增长很快，需要限制规模。
+    # 但「今天有可用券」的候选必须**无条件保留** —— 否则会出现
+    # 「用户明明有券，推荐里却看不到」，这正是优惠券功能最典型的失效方式。
+    favored_names = {f.name for f in pool if coupon_map and f.name in coupon_map}
+    favored = [f for f in pool if f.name in favored_names]
+    others = [f for f in pool if f.name not in favored_names]
+
     single_best = pool[0]
     enough = max(1, int(-(-gap.protein // single_best.protein)))  # 向上取整
-    limit = max(12, enough * 4)
-    pool = pool[:limit]
+    limit = max(30, enough * 8)
+    pool = favored + others[: max(0, limit - len(favored))]
 
     best: List[Plan] = []
     for size in range(1, max_items + 1):
@@ -301,7 +336,7 @@ def recommend(
             plan = _sum(portions)
             if plan.kcal > gap.kcal * 1.6:
                 continue
-            value, warns = score_plan(plan, gap, weights)
+            value, warns = score_plan(plan, gap, weights, coupon_map)
             plan.score = value
             plan.warnings = warns
             best.append(plan)
@@ -325,4 +360,9 @@ def explain(plan: Plan, gap: Gap, spec: StateSpec) -> str:
         lines.append("代价：" + "；".join(plan.warnings))
     if plan.protein_per_kcal:
         lines.append(f"本次每克蛋白的热量代价：{plan.protein_per_kcal:.1f} kcal/g")
+    if plan.coupons:
+        lines.append("")
+        lines.append(
+            "注：标有【可用券】的商品，你名下已有此刻可用的优惠券，下单时记得勾选。"
+        )
     return "\n".join(lines)

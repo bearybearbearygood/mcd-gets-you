@@ -19,6 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from coupons import Coupon, parse_coupons, usable_now  # noqa: E402
 from mcd_client import DEFAULT_URL, MCDClient  # noqa: E402
 from nutrition import (  # noqa: E402
     build_index,
@@ -33,6 +34,33 @@ from planner import (  # noqa: E402
     compute_gap,
     recommend,
 )
+
+
+def build_coupon_map(menu: dict, index: dict, coupons) -> dict:
+    """建立「营养名 -> 可用券」的映射。
+
+    做法是**用券名直接匹配营养表** —— 券名本身就带商品名（如「中薯条买一送一」），
+    比菜单名更接近营养表的命名方式。再确认该商品确实在售，两者都满足才关联，
+    避免推荐出今天根本买不到的券。
+    """
+    on_sale = set()
+    for item in menu.values():
+        food = match_food(str(item.get("name", "")), index)
+        if food is not None:
+            on_sale.add(food.name)
+
+    mapping: dict = {}
+    for coupon in coupons:
+        food = match_food(coupon.name, index)
+        if food is None or food.name not in on_sale:
+            continue
+        existing = mapping.get(food.name)
+        if existing is None or (
+            coupon.price is not None
+            and (existing.price is None or coupon.price < existing.price)
+        ):
+            mapping[food.name] = coupon
+    return mapping
 
 
 def fetch(client: MCDClient, tool: str, args: dict) -> dict:
@@ -89,6 +117,22 @@ def main() -> int:
     usable = len({food.name for food in candidates})
     print(f"  {len(menu)} 项在售，其中 {usable} 项能匹配到营养数据")
 
+    # 优惠券是加分项：取不到不应阻断主流程，所以整体包在 try 里。
+    coupon_map: dict = {}
+    try:
+        print("→ 读取优惠券 …")
+        coupon_text = client.call_tool("query-my-coupons", {"page": "1"})[
+            "result"
+        ]["content"][0]["text"]
+        usable_coupons = usable_now(parse_coupons(coupon_text))
+        coupon_map = build_coupon_map(menu, index, usable_coupons)
+        print(
+            f"  此刻可用 {len(usable_coupons)} 张，"
+            f"其中 {len(coupon_map)} 张能对应到在售商品"
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"  跳过（{type(exc).__name__}）")
+
     spec = STATES[args.state]
     target = Target(protein=args.protein, kcal=args.kcal, sodium=args.sodium)
     gap = compute_gap(Intake(), target, spec)
@@ -99,7 +143,9 @@ def main() -> int:
         f"｜ 钠预算 {gap.sodium:.0f}mg\n"
     )
 
-    plans = recommend(candidates, gap, max_items=2, top_n=args.top)
+    plans = recommend(
+        candidates, gap, max_items=2, top_n=args.top, coupon_map=coupon_map
+    )
     if not plans:
         print("没有找到合适方案。")
         return 0
