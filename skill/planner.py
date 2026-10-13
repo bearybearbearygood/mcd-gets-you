@@ -211,14 +211,26 @@ class Weights:
 
 
 def _sum(items: Sequence[tuple]) -> Plan:
-    plan = Plan(items=[])
+    """把 (食物, 份数) 序列汇总成 Plan。
+
+    同名产品会合并成一项 —— 组合搜索会产生「中薯条×1 + 中薯条×1」这类
+    结果，直接展示出来像是点了两样东西，合并成「中薯条×2」才符合直觉。
+    """
+    merged: Dict[str, PlanItem] = {}
     for food, portions in items:
-        plan.items.append(PlanItem(food=food, portions=portions))
-        plan.protein += food.protein * portions
-        plan.kcal += food.kcal * portions
-        plan.sodium += food.sodium * portions
-        plan.fat += food.fat * portions
-        plan.carb += food.carb * portions
+        if food.name in merged:
+            merged[food.name].portions += portions
+        else:
+            merged[food.name] = PlanItem(food=food, portions=portions)
+
+    plan = Plan(items=list(merged.values()))
+    for item in plan.items:
+        food, factor = item.food, item.portions
+        plan.protein += food.protein * factor
+        plan.kcal += food.kcal * factor
+        plan.sodium += food.sodium * factor
+        plan.fat += food.fat * factor
+        plan.carb += food.carb * factor
     return plan
 
 
@@ -246,7 +258,10 @@ def score_plan(
     # 供输出层提示用户用哪张券。
     plan.coupons = []
     if coupon_map:
-        plan.coupons = [it.food.name for it in plan.items if it.food.name in coupon_map]
+        for item in plan.items:
+            name = item.food.name
+            if name in coupon_map and name not in plan.coupons:
+                plan.coupons.append(name)
         if plan.coupons:
             value += weights.coupon * min(len(plan.coupons), 2)
 
