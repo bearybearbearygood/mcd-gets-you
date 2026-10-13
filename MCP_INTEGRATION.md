@@ -17,54 +17,81 @@
 
 配置示例见 [`mcp-config.example.json`](./mcp-config.example.json)，**仓库内不包含任何真实 Token**。
 
-## 2. Tool 总览
+## 2. 实际使用的 Tool
 
-麦当劳 MCP 当前对外提供 **35 个 Tool**，按业务域划分为 5 类：
+本项目用到 6 个 Tool，全部为**只读**调用：
 
-| 业务域 | Tool 数 | Tool 名称 |
-|---|---:|---|
-| 点餐 / 门店 | 12 | `query-nearby-stores`、`delivery-query-stores`、`delivery-query-addresses`、`delivery-create-address`、`query-meals`、`query-meal-detail`、`query-meal-assistance`、`calculate-price`、`create-order`、`cancel-order`、`query-order`、`order-list` |
-| 券 / 活动 | 8 | `available-coupons`、`auto-bind-coupons`、`query-my-coupons`、`query-store-coupons`、`query-survey-coupon`、`query-promotions`、`campaign-calendar`、`now-time-info` |
-| 营养 | 1 | `list-nutrition-foods` |
-| 积分 / 商城 / 抽奖 | 9 | `query-my-account`、`mall-points-products`、`mall-product-detail`、`mall-create-order`、`mall-order-list`、`mall-order-detail`、`query-lottery-info`、`draw-lottery`、`query-my-prizes` |
-| 主题活动 / 派对 | 5 | `query-party-city`、`query-party-store`、`query-party-store-date`、`query-party-store-session`、`party-order-create` |
-
-## 3. 本项目使用的 Tool
-
-TODO（定稿后填写）：只保留本项目真正调用的 Tool，并逐个说明「为什么用、取到了什么、用在产品的哪一步」。
-
-| Tool | 用途 | 产出如何被使用 |
+| Tool | 用途 | 取到什么 |
 |---|---|---|
-| TODO | TODO | TODO |
+| `list-nutrition-foods` | 拉取全量营养表 | 160 条记录，含蛋白 / 脂肪 / 碳水 / 钠 / 钙 |
+| `query-nearby-stores` | 定位用户附近门店 | 门店编码 `storeCode`、营业状态 |
+| `query-meals` | 拉取该门店在售菜单 | 119 项产品，含现价与优惠标记 |
+| `query-meal-detail` | 拆解套餐结构 | 选配轮次、每项差价、特制项清单 |
+| `calculate-price` | 核算下单价格 | 实付价（单位：分） |
+| `now-time-info` | 取服务端时间 | 用于判断当前时段可用菜单 |
 
-## 4. 调用流程
+**未使用的写操作**：`create-order`、`cancel-order`、`auto-bind-coupons`、`draw-lottery`、`mall-create-order`、`party-order-create`。本项目只读，不会对用户账号产生任何变动。
 
-TODO（定稿后填写）：用流程图 + 文字说明一次完整调用的编排顺序、并发/串行关系、失败与降级路径。
+## 3. 调用流程
 
 ```
-用户输入
+用户说：今天蛋白还差不少，想吃麦当劳，别太油
    │
-   ▼
-[ TODO 第一步调用 ]
+   ├─[1] query-nearby-stores ──→ storeCode
    │
-   ▼
-[ TODO 第二步调用 ]
+   ├─[2] list-nutrition-foods ─→ 营养表（单次会话内复用）
    │
-   ▼
-产出结果
+   ├─[3] query-meals ──────────→ 该店在售菜单 + 价格
+   │        │
+   │        └── 与营养表做名称映射，得到「在售 ∩ 有营养数据」的候选集
+   │
+   ├─[4] 缺口计算
+   │        目标（蛋白 / 热量 / 钠）− 已摄入，再按「今日状态」调整约束松紧
+   │
+   ├─[5] 组合搜索
+   │        在候选集中枚举单品组合，按「补足缺口的程度」排序，
+   │        对「超出预算」的热量与钠扣分（低于预算不加分）
+   │
+   ├─[6] query-meal-detail ────→ 若候选是套餐：
+   │        拆解为选配轮次，枚举换购搭配，找出补蛋白更划算的那一种
+   │
+   └─[7] query-meal-detail ────→ 取特制项清单
+            若脂肪超标，建议去掉高脂特制项（如吉士）
+
+输出：方案 + 代价明细（蛋白 / 热量 / 钠 / 脂肪）+ 换购建议 + 特制建议
 ```
 
-## 5. 业务价值
+## 4. 关键设计决策
 
-TODO（定稿后填写）：说明这套 Tool 组合解决了什么真实问题，与「不使用 MCP、纯靠人工或静态数据」相比的增量在哪。
+**为什么热量只做「上限」而不做优化目标？**
 
-## 6. 工程注意事项
+早期版本把「热量越低越好」写进了评分，结果推荐把中薯条换成小杯玉米杯、把可乐换成美式咖啡 —— 热量是降了，但用户的诉求本来是「别超」，不是「越低越好」。修正后：热量与钠只在**超出预算**时扣分，低于预算不加分。排序主键改为「补足蛋白」，次键是「偏离默认搭配的程度」。
 
-以下为集成过程中确认的事实，供接入方参考：
+**为什么套餐必须拆开算？**
 
+营养表里没有套餐的营养数据。要让套餐参与推荐，只能通过 `query-meal-detail` 拆出子项、逐项查营养表再累加。这顺带解锁了「换购优化」—— 因为每一轮的候选都带差价，可以枚举比较。
+
+**为什么模糊匹配要区分「套餐」与「单品」？**
+
+菜单里同时存在「不素之霸双层牛堡」与「不素之霸双层牛堡三件套」，前者是单品、后者含薯条与饮料，营养相差 20g 蛋白以上。如果按字符串包含关系匹配，套餐会被错配成单品，导致推荐出严重低估的代价。因此模糊匹配阶段强制要求两侧的「是否为套餐」属性一致。
+
+## 5. 工程注意事项
+
+以下是集成过程中确认的事实，供接入方参考：
+
+- **返回格式不统一**：多数 Tool 的响应带 `## Original Response` 分隔符，但也有 Tool（如 `query-nearby-stores`）直接把 JSON 跟在说明文字后，且 JSON 之后可能有尾随文本。统一用「扫描首个可解析的 `{` + `raw_decode`」处理，不要假定固定分隔符。
+- **个别 Tool 返回非 JSON 的结构化数据**：`list-nutrition-foods` 的 `data` 字段是 TOON 格式字符串，需单独解析，不能直接 `json.loads`。
+- **价格单位是「分」**：`calculate-price` 返回的 `price` / `originalPrice` 等字段均以分为单位，展示前需除以 100。
+- **数据源存在重复行**：营养表中有同名同值的重复记录，入库前应去重。
+- **字段有效性不一致**：营养表的 `nutritionDescription` 字段全为空，实际可用的是其余五个营养字段。
 - **写操作 Tool 需谨慎**：`create-order`、`cancel-order`、`auto-bind-coupons`、`draw-lottery`、`mall-create-order`、`party-order-create` 会真实占用账号资源，接入方应做二次确认，不应在自动化流程中无提示触发。
-- **返回格式不统一**：多数 Tool 返回 JSON，但个别 Tool 返回 TOON 格式，直接按 JSON 解析会失败，需先做格式判定。
-- **数据完整性**：部分 Tool 返回的字段存在空值或缺省占位，使用前需做校验，不应假定字段必然有值。
-- **文档与实现存在差异**：官方文档列出的 Tool 清单与实际接口返回并不完全一致，接入应以 `tools/list` 的实际返回为准。
 
 > 以上仅记录本项目集成时确认的事实与应对方式，不含任何 Token、账号信息或他人数据。
+
+## 6. 业务价值
+
+麦当劳的营养数据是公开的，但**没有人把它和「我今天缺什么」连起来**。
+
+市面上的同类项目大多止步于「统计与展示」，用户拿到数字之后仍要自己做决策。本项目把最后一公里补上：从「你今天缺多少」直接走到「点这一个」，并把代价算清楚。
+
+对用户的价值，是省掉一次营养师式的计算；对麦当劳的价值，是**把营养数据从「合规披露」变成「点餐决策依据」** —— 用户不再因为「怕不健康」而放弃一顿本来想吃的麦当劳，而是知道怎么点能吃得更好。
