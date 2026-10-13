@@ -104,6 +104,13 @@ STATES: Dict[str, StateSpec] = {
         sodium_factor=0.95,
         relax=("fat", "carb"),
     ),
+    "happy": StateSpec(
+        key="happy",
+        label="今天很开心 / 值得奖励",
+        note="有成就感的时刻，允许用一点甜或高热量犒赏自己，蛋白照补、钠不放松。",
+        kcal_factor=1.10,
+        relax=("fat", "carb"),
+    ),
     "rush": StateSpec(
         key="rush",
         label="赶时间 / 加班",
