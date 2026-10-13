@@ -28,6 +28,7 @@ from itertools import combinations_with_replacement
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from nutrition import Food
+from period import Period
 
 
 @dataclass
@@ -67,9 +68,10 @@ class Target:
 class StateSpec:
     """状态对约束的调整规则。
 
-    kcal_factor / sodium_factor  预算伸缩系数（>1 表示放宽）
-    relax                        允许超出的维度，最多一项
-    note                         该状态的一句话说明，用于输出给用户
+    kcal_factor / sodium_factor / protein_factor  预算或目标的伸缩系数
+        （>1 表示放宽或提高）
+    relax                                        允许超出的维度，最多一两项
+    note                                         该状态的一句话说明，用于输出
     """
 
     key: str
@@ -77,6 +79,7 @@ class StateSpec:
     note: str
     kcal_factor: float = 1.0
     sodium_factor: float = 1.0
+    protein_factor: float = 1.0
     relax: Tuple[str, ...] = ()
 
 
@@ -105,6 +108,33 @@ STATES: Dict[str, StateSpec] = {
         key="rush",
         label="赶时间 / 加班",
         note="不追求效率最优，选好拿好吃的，钠仍守死。",
+    ),
+    "night": StateSpec(
+        key="night",
+        label="熬夜 / 没睡好",
+        note="避免高糖高脂让你更困，选蛋白足、升糖平稳的，热量收着点。",
+        kcal_factor=0.9,
+    ),
+    "cut": StateSpec(
+        key="cut",
+        label="减脂期",
+        note="热量是硬约束，但不许亏蛋白 —— 减脂最怕连肌肉一起掉。",
+        kcal_factor=0.85,
+        sodium_factor=0.9,
+    ),
+    "bulk": StateSpec(
+        key="bulk",
+        label="增肌期",
+        note="蛋白目标提高、热量放宽，优先吃够，再谈干净。",
+        kcal_factor=1.15,
+        protein_factor=1.25,
+    ),
+    "sick": StateSpec(
+        key="sick",
+        label="肠胃不适 / 不舒服",
+        note="避开油炸和重口，选清淡、易消化的，蛋白也要补。",
+        kcal_factor=0.85,
+        sodium_factor=0.85,
     ),
 }
 
@@ -176,13 +206,26 @@ class Plan:
         return text
 
 
-def compute_gap(intake: Intake, target: Target, spec: StateSpec) -> Gap:
-    """按状态调整后的缺口。"""
+def compute_gap(
+    intake: Intake,
+    target: Target,
+    spec: StateSpec,
+    period: Optional[Period] = None,
+) -> Gap:
+    """按「状态 × 时段」的组合调整后的缺口。
+
+    蛋白目标受两重影响：状态（如增肌期提高）与时段（如下午茶/夜宵降低），
+    二者相乘。热量预算叠加时段的收缩系数 —— 晚餐吃最后一顿，总量该收一点。
+    """
     kcal_budget = target.kcal * spec.kcal_factor
     sodium_budget = target.sodium * spec.sodium_factor
+    protein_goal = target.protein * spec.protein_factor
+    if period is not None:
+        kcal_budget *= period.kcal_factor
+        protein_goal *= period.protein_factor
     fat_budget = target.fat * spec.kcal_factor if target.fat is not None else None
     return Gap(
-        protein=max(0.0, target.protein - intake.protein),
+        protein=max(0.0, protein_goal - intake.protein),
         kcal=max(0.0, kcal_budget - intake.kcal),
         sodium=max(0.0, sodium_budget - intake.sodium),
         fat=None if fat_budget is None else max(0.0, fat_budget - intake.fat),

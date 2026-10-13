@@ -27,6 +27,7 @@ from nutrition import (  # noqa: E402
     load_from_tool_text,
     match_food,
 )
+from period import classify_period  # noqa: E402
 from planner import (  # noqa: E402
     STATES,
     Intake,
@@ -134,10 +135,26 @@ def main() -> int:
         print(f"  跳过（{type(exc).__name__}）")
 
     spec = STATES[args.state]
-    target = Target(protein=args.protein, kcal=args.kcal, sodium=args.sodium)
-    gap = compute_gap(Intake(), target, spec)
 
-    print(f"\n【{spec.label}】{spec.note}")
+    # 时段：从服务端时间判断这顿饭在一天里的位置
+    import re as _re
+    from datetime import datetime as _dt
+    period = None
+    try:
+        now_text = client.call_tool("now-time-info", {})["result"]["content"][0]["text"]
+        matched = _re.search(r"(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})", now_text)
+        if matched:
+            period = classify_period(_dt(*map(int, matched.groups())))
+    except Exception:
+        pass
+    if period is None:
+        period = classify_period()
+
+    target = Target(protein=args.protein, kcal=args.kcal, sodium=args.sodium)
+    gap = compute_gap(Intake(), target, spec, period)
+
+    print(f"\n【{period.label}】{period.note}")
+    print(f"【{spec.label}】{spec.note}")
     print(
         f"缺口：蛋白 {gap.protein:.0f}g ｜ 热量预算 {gap.kcal:.0f}kcal "
         f"｜ 钠预算 {gap.sodium:.0f}mg\n"
