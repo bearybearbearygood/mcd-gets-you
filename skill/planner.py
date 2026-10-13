@@ -256,13 +256,19 @@ def score_plan(
 
     # 优惠券：只记「今天真的可用」的券，命中即加分并记入方案，
     # 供输出层提示用户用哪张券。
+    # 券只在「已经补足缺口」的前提下才加分。
+    #
+    # 用户的原话是「今天点双吉也行、麦香鸡也行，但你正好有麦香鸡的券，
+    # 那就推麦香鸡」—— 前提是这两个方案**都能补足**。如果还没补足蛋白
+    # 就把券的分加上，会出现「为了用券而牺牲营养」的推荐，本末倒置。
+    # 券的记录不受影响，输出层仍然会提示用户这个商品有券可用。
     plan.coupons = []
     if coupon_map:
         for item in plan.items:
             name = item.food.name
             if name in coupon_map and name not in plan.coupons:
                 plan.coupons.append(name)
-        if plan.coupons:
+        if plan.coupons and coverage >= 1.0:
             value += weights.coupon * min(len(plan.coupons), 2)
 
     over_kcal = max(0.0, plan.kcal - gap.kcal)
