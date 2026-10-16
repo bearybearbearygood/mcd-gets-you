@@ -1,0 +1,342 @@
+{
+  "kind": "redacted-field-extract",
+  "notice": "Historical live MCP response fields; not complete raw responses or a current price guarantee. No credentials or coupon identifiers included.",
+  "endpoint": "https://mcp.mcd.cn",
+  "records": [
+    {
+      "tool": "calculate-price",
+      "arguments": {
+        "storeCode": "1950564",
+        "orderType": 1,
+        "beType": 1,
+        "items": [
+          {
+            "productCode": "9900003586",
+            "quantity": 1
+          }
+        ]
+      },
+      "datetime": "2026-10-16 17:35:51",
+      "success": true,
+      "code": 200,
+      "data": {
+        "price": 2400,
+        "productPrice": 2400,
+        "discount": 0,
+        "productList": [
+          {
+            "productCode": "9900003586",
+            "productName": "双层深海鳕鱼堡",
+            "quantity": 1,
+            "originalSubtotal": 2400,
+            "subtotal": 2400
+          }
+        ]
+      }
+    },
+    {
+      "tool": "calculate-price",
+      "arguments": {
+        "storeCode": "1950564",
+        "orderType": 1,
+        "beType": 1,
+        "items": [
+          {
+            "productCode": "9900005413",
+            "quantity": 1,
+            "roundList": [
+              {
+                "round": "1",
+                "comboItemList": [
+                  {
+                    "code": "520312",
+                    "quantity": 1,
+                    "modification": {
+                      "values": [
+                        {
+                          "code": "100126",
+                          "key": "0-1",
+                          "quantity": 1
+                        },
+                        {
+                          "code": "100141",
+                          "key": "0-1",
+                          "quantity": 1
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "round": "2",
+                "comboItemList": [
+                  {
+                    "code": "4810",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "round": "3",
+                "comboItemList": [
+                  {
+                    "code": "3050",
+                    "quantity": 1,
+                    "modification": {
+                      "values": [
+                        {
+                          "code": "200002",
+                          "key": "0-1",
+                          "quantity": 1
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "datetime": "2026-10-16 17:35:47",
+      "success": true,
+      "code": 200,
+      "data": {
+        "price": 3500,
+        "productPrice": 3500,
+        "discount": 0,
+        "productList": [
+          {
+            "productCode": "9900005413",
+            "productName": "双层深海鳕鱼堡三件套",
+            "quantity": 1,
+            "originalSubtotal": 3500,
+            "subtotal": 3500
+          }
+        ]
+      }
+    },
+    {
+      "tool": "calculate-price",
+      "arguments": {
+        "storeCode": "1950564",
+        "orderType": 1,
+        "beType": 1,
+        "items": [
+          {
+            "productCode": "9900000893",
+            "quantity": 1,
+            "roundList": [
+              {
+                "round": "1",
+                "comboItemList": [
+                  {
+                    "code": "520312",
+                    "quantity": 1,
+                    "modification": {
+                      "values": [
+                        {
+                          "code": "100126",
+                          "key": "0-1",
+                          "quantity": 1
+                        },
+                        {
+                          "code": "100141",
+                          "key": "0-1",
+                          "quantity": 1
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "round": "2",
+                "comboItemList": [
+                  {
+                    "code": "4810",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "round": "3",
+                "comboItemList": [
+                  {
+                    "code": "515106",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "round": "4",
+                "comboItemList": [
+                  {
+                    "code": "3050",
+                    "quantity": 1,
+                    "modification": {
+                      "values": [
+                        {
+                          "code": "200002",
+                          "key": "0-1",
+                          "quantity": 1
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "datetime": "2026-10-16 17:41:19",
+      "success": true,
+      "code": 200,
+      "data": {
+        "price": 5850,
+        "productPrice": 5850,
+        "discount": 0,
+        "productList": [
+          {
+            "productCode": "9900000893",
+            "productName": "双层深海鳕鱼堡四件套",
+            "quantity": 1,
+            "originalSubtotal": 5850,
+            "subtotal": 5850
+          }
+        ]
+      }
+    },
+    {
+      "tool": "calculate-price",
+      "arguments": {
+        "storeCode": "1950564",
+        "orderType": 1,
+        "beType": 1,
+        "items": [
+          {
+            "productCode": "9900013304",
+            "quantity": 1,
+            "roundList": [
+              {
+                "round": "1",
+                "comboItemList": [
+                  {
+                    "code": "1600",
+                    "quantity": 1
+                  }
+                ]
+              },
+              {
+                "round": "2",
+                "comboItemList": [
+                  {
+                    "code": "4437",
+                    "quantity": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "datetime": "2026-10-16 17:37:32",
+      "success": true,
+      "code": 200,
+      "data": {
+        "price": 1490,
+        "productPrice": 1490,
+        "discount": 0,
+        "productList": [
+          {
+            "productCode": "9900013304",
+            "productName": "人气经典随心配",
+            "quantity": 1,
+            "originalSubtotal": 1490,
+            "subtotal": 1490
+          }
+        ]
+      }
+    },
+    {
+      "tool": "query-meals",
+      "arguments": {
+        "storeCode": "1950564",
+        "orderType": 1,
+        "beType": 1
+      },
+      "datetime": "2026-10-16 17:34:29",
+      "data": {
+        "selectedMeals": {
+          "9900005413": {
+            "name": "双层深海鳕鱼堡三件套",
+            "currentPrice": "35",
+            "originalPrice": "47.5",
+            "canWithOrder": false
+          },
+          "9900003586": {
+            "name": "双层深海鳕鱼堡",
+            "currentPrice": "24",
+            "originalPrice": "24",
+            "canWithOrder": false
+          },
+          "9900000893": {
+            "name": "双层深海鳕鱼堡四件套",
+            "currentPrice": "32",
+            "originalPrice": "58.5",
+            "discountType": "随单购麦金卡优惠",
+            "canWithOrder": true
+          }
+        }
+      }
+    },
+    {
+      "tool": "list-nutrition-foods",
+      "arguments": {},
+      "datetime": "2026-10-16 16:04:14",
+      "data": {
+        "rowCount": 160,
+        "selectedNutrition": [
+          {
+            "productName": "中薯条",
+            "energyKcal": "289",
+            "protein": "4",
+            "fat": "12"
+          },
+          {
+            "productName": "大薯条",
+            "energyKcal": "379",
+            "protein": "6",
+            "fat": "16"
+          },
+          {
+            "productName": "小薯条",
+            "energyKcal": "210",
+            "protein": "3",
+            "fat": "9"
+          },
+          {
+            "productName": "板烧鸡腿堡",
+            "energyKcal": "391",
+            "protein": "23",
+            "fat": "17"
+          },
+          {
+            "productName": "无糖可口可乐中杯",
+            "energyKcal": "0",
+            "protein": "0",
+            "fat": "0"
+          },
+          {
+            "productName": "汉堡包",
+            "energyKcal": "248",
+            "protein": "13",
+            "fat": "8"
+          }
+        ]
+      }
+    }
+  ]
+}
